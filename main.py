@@ -37,7 +37,7 @@ def controls():#Controls for CV
     sg.theme('DarkAmber')   # Add a touch of color
     layout = [
         [sg.Text("Comuter Vision Control Station")],
-        [sg.Image(filename="", key="-IMAGE-")],
+        [sg.Image(filename='', key='image')],
         [sg.Button("Edge")],
         [sg.Button("Motion_Detection")],
         [sg.Button("Exit")]
