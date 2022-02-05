@@ -4,58 +4,81 @@ import threading
 import os
 import PySimpleGUI as sg
 
-#global
-show = 'Frame';
+#global variables
+modes = ['Motion_Detection', 'Edge', 'Normal', 'Gray_Scale']
+videomode = 'Normal'; #[Motion_Detection, Edge, Normal,Gray_Scale]
+exitprotocol = False;
 #
 
 def video():#Display
-    global show
+    global videomode,exitprotocol
 
     cap = cv2.VideoCapture(1)
+    display = 'Computer Vision Display'
+    cv2.namedWindow(display, cv2.WINDOW_NORMAL)
 
-    while True:
+    while (exitprotocol != True):
         ret, frame = cap.read()
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        edges = cv2.Canny(frame,200,200) 
-        print(show + " from CV")
-        if show == 'Edge':
-            cv2.imshow("Main frame",edges)
-        elif show == 'Frame':
-            cv2.imshow("Main frame",frame)
-        elif show == 'Exit':
+        
+        
+        print(videomode + " from CV")
+
+        if videomode == 'Normal':
+            cv2.imshow(display,frame)
+        elif videomode == 'Edge':
+            edges = cv2.Canny(frame,200,200) 
+            cv2.imshow(display,edges)
+        elif videomode == 'Gray_Scale':
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            cv2.imshow(display,gray)
+        else:
+            print("Unrecognized Video Mode")
+            exitprotocol = True
             break
+
 
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
+            exitprotocol = True
             break
-
+    cap.release()
+    cv2.destroyAllWindows()
+    
 
 def controls():#Controls for CV 
-    global show
+    global videomode, exitprotocol, modes
     ##Control UI
     sg.theme('DarkAmber')   # Add a touch of color
     layout = [
-        [sg.Text("Comuter Vision Control Station")],
-        [sg.Image(filename='', key='image')],
+        [sg.Text("Video Mode:", s=(60,1), font='Helvitica')],
+        [sg.Button("Normal")],
         [sg.Button("Edge")],
-        [sg.Button("Motion_Detection")],
+        [sg.Button("Motion Detection")],
+        [sg.Text("Custom Mode:")],
+        [sg.Multiline(size=(30,1), key='input'),sg.Button("Submit")],
         [sg.Button("Exit")]
 
     ]
-    controlpanel = sg.Window("CV Control", layout)
+    controlpanel = sg.Window("Comuter Vision Control Station", layout)
     ##
 
-    while True:     
+    while (exitprotocol != True):     
         event, values = controlpanel.read()
         if event == sg.WIN_CLOSED or event == 'Exit': # if user closes window or clicks cancel
-            show = 'Exit'
+            exitprotocol = True;
             break
         elif event == 'Edge':
-            show = 'Edge'
-        elif event == 'Motion_Detection':
-            show = 'Frame'
-
+            videomode = 'Edge'
+        elif event == 'Motion Detection':
+            videomode = 'Motion_Detection'
+        elif event == 'Normal':
+            videomode = 'Normal'
+        elif event == 'Submit' and videomode in modes:
+            videomode = values['input']
+            
+    controlpanel.close()
 
 # creating threads
 if __name__ == "__main__":
@@ -67,20 +90,14 @@ if __name__ == "__main__":
     print("Main thread name: {}".format(threading.current_thread().name))
   
     # creating threads
-    t1 = threading.Thread(target=video, name='t1')
-    t2 = threading.Thread(target=controls, name='t2')  
+    video = threading.Thread(target=video, name='Video')
+    controls = threading.Thread(target=controls, name='Controls')  
   
     # starting threads
-    t1.start()
-    t2.start()
+    video.start()
+    controls.start()
   
     # wait until all threads finish
-    t1.join()
-    t2.join()
+    video.join()
+    controls.join()
 
-
-    #END
-    cap.release()
-    cv2.destroyAllWindows()
-    controlpanel.close()
-# out.release()
