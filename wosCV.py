@@ -1,6 +1,9 @@
 import cv2
 import pafy
 import face_recognition
+from mtcnn.mtcnn import MTCNN
+# Load the pre-trained MTCNN model
+detector = MTCNN()
 import time
 from datetime import datetime
 import numpy as np
@@ -22,10 +25,12 @@ if args.l is not None:
 else:
     # Replace 'https://youtu.be/kusY9S8BkMU' with the actual YouTube video URL
     youtube_url = 'https://www.youtube.com/watch?v=cH7VBI4QQzA'
+    #youtube_url = 'https://www.youtube.com/watch?v=PDTmRgc2zQc'
         # Get the YouTube video object
     video = pafy.new(youtube_url)
         # Get the stream URL of the video
     best_stream = video.getbest(preftype="mp4")
+    print(best_stream)
         # # Access the width and height attributes of the stream
     width = int(best_stream.dimensions[1])
     height = int(best_stream.dimensions[0])
@@ -34,6 +39,14 @@ else:
     cv2.namedWindow("YouTube Video", cv2.WINDOW_NORMAL)
         # Open the video stream
     cap = cv2.VideoCapture(best_stream.url)
+    cv2.resizeWindow("YouTube Video", width, height)   
+
+    ## Tests to optimize opencv delays 
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 3)  # Set buffer size to reduce delay
+    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'H264'))
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+
 # Load known faces
 known_face_encodings = []
 known_face_names = []
@@ -47,7 +60,7 @@ if not cap.isOpened():
 prototxt_path = 'deploy.prototxt'
 model_path = 'res10_300x300_ssd_iter_140000.caffemodel'
 # Example using deep learning-based face detection
-net = cv2.dnn.readNetFromCaffe(prototxt_path, model_path)
+# net = cv2.dnn.readNetFromCaffe(prototxt_path, model_path)
 # blob = cv2.dnn.blobFromImage(frame, scalefactor=1.0, size=(300, 300), mean=(104.0, 177.0, 123.0))
 exit_flag = False
 
@@ -58,64 +71,75 @@ def thread_worker(thread_id):
 
     while not exit_flag:
         frame = thread_safe_q.get() ## switched
-        print("getting")
+
+        print(f"Status: known_face_names: {len(known_face_names)}")
         # frame = cv2.cvtColor(grey, cv2.COLOR_BGR2GRAY)
+        faces = detector.detect_faces(frame)
+        for face in faces:
+            x, y, width, height = face['box']
+            cv2.rectangle(frame, (x, y), (x + width, y + height), (255, 0, 0), 2)
+        if (len(faces) > 0):
+            cv2.imwrite("faces_detected/(MM){}.jpg".format(datetime.now()),frame)
+            print("Found")
+        # blob = cv2.dnn.blobFromImage(frame, scalefactor=1.0, size=(width, height), mean=(104.0, 177.0, 123.0))
+        # net.setInput(blob)
+        # try: 
+        #     detections = net.forward()
+        # except:
+        #     continue;
+        # # Draw rectangles around detected faces
+        # for i in range(detections.shape[2]):
+        #     confidence = detections[0, 0, i, 2]
+        #     if confidence >= .8:  # Adjust confidence threshold as needed
+        #         print(f"""Status: 
+        #               known_face_names: {len(known_face_names)}
+        #               confidence: {confidence}
+        #                 """)
+        #         print(confidence);
 
-        blob = cv2.dnn.blobFromImage(frame, scalefactor=1.0, size=(width, height), mean=(104.0, 177.0, 123.0))
-        net.setInput(blob)
-        try: 
-            detections = net.forward()
-        except:
-            continue;
-        # Draw rectangles around detected faces
-        for i in range(detections.shape[2]):
-            confidence = detections[0, 0, i, 2]
-            if confidence >= .8 :  # Adjust confidence threshold as needed
-                # print(confidence);
+        #         box = detections[0, 0, i, 3:7] * np.array([width, height, width, height])
+        #         (startX, startY, endX, endY) = box.astype("int")
+        #         # cropped_face = frame[startY:endY, startX:endX]
+        #         # if cropped_face.size > 0:
+        #         # cv2.imwrite("faces_detected/(FD){}.jpg".format(datetime.now()),frame)
 
-                box = detections[0, 0, i, 3:7] * np.array([width, height, width, height])
-                (startX, startY, endX, endY) = box.astype("int")
-                # cropped_face = frame[startY:endY, startX:endX]
-                # if cropped_face.size > 0:
-                # cv2.imwrite("faces_detected/(FD){}.jpg".format(datetime.now()),frame)
+        #         face_locations = face_recognition.face_locations(frame)
+        #         face_encodings = face_recognition.face_encodings(frame, face_locations)
+        #         # if len(known_face_names) > 10:
+        #         #     known_face_encodings = [];
+        #         #     known_face_names = [];
+        #         for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
+        #             matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
+        #             name = "unkown"
+        #             if True in matches:
+        #                 first_match_index = matches.index(True)
+        #                 name = known_face_names[first_match_index]
 
-                face_locations = face_recognition.face_locations(frame)
-                face_encodings = face_recognition.face_encodings(frame, face_locations)
-                # if len(known_face_names) > 10:
-                #     known_face_encodings = [];
-                #     known_face_names = [];
-                for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
-                    matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
-                    name = "unkown"
-                    if True in matches:
-                        first_match_index = matches.index(True)
-                        name = known_face_names[first_match_index]
+        #             else:
+        #                 if len(known_face_encodings) < 20:
+        #                     known_face_encodings.append(face_encoding)
+        #                     name = f"Person{len(known_face_encodings)}"  # Assign a default name
+        #                     known_face_names.append(name)
+        #                 else:
+        #                     known_face_encodings.pop(0)
+        #                     known_face_names.pop(0)
+        #                     known_face_encodings.append(face_encoding)
+        #                     name = f"Person{len(known_face_encodings)}"  # Assign a default name
+        #                     known_face_names.append(name)
 
-                    else:
-                        if len(known_face_encodings) < 20:
-                            known_face_encodings.append(face_encoding)
-                            name = f"Person{len(known_face_encodings)}"  # Assign a default name
-                            known_face_names.append(name)
-                        else:
-                            known_face_encodings.pop(0)
-                            known_face_names.pop(0)
-                            known_face_encodings.append(face_encoding)
-                            name = f"Person{len(known_face_encodings)}"  # Assign a default name
-                            known_face_names.append(name)
+        #                 cv2.rectangle(frame, (left, top), (right, bottom), (255, 0, 0), 2)
+        #                 # cropped_face = frame[startY:endY, startX:endX]
+        #         # if len(face_recognition.face_locations(frame)) > 0:
+        #             # print(confidence);
+        #         cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 2)
 
-                # cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 2)
-                        cropped_face = frame[startY:endY, startX:endX]
-                # if len(face_recognition.face_locations(frame)) > 0:
-                    # print(confidence);
-                        cv2.imwrite("faces_detected/{}.jpg".format(datetime.now()),cropped_face)
-                # else:
-                #     cv2.imwrite("faces_detected/(FD){}.jpg".format(datetime.now()),frame)
-
+        #         cv2.imwrite("faces_detected/{}.jpg".format(datetime.now()),frame)
+          
         thread_safe_q.task_done()
         
 # Create a thread array
 threads = []
-NUM_THREADS = 4;
+NUM_THREADS = 1;
 
 try: 
     # Turn-on the worker thread.
@@ -133,6 +157,9 @@ try:
         ret, frame = cap.read()
         # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         thread_safe_q.put(frame)
+        # print(f"queue size: {thread_safe_q.qsize()}")
+        if thread_safe_q.full():
+            thread_safe_q.get()
         # frame = thread_safe_q.get() 
         # if not ret:
         #     print("Error: Failed to capture frame.")
@@ -143,7 +170,7 @@ try:
         if cv2.waitKey(1) & 0xFF == ord('q'):
             print("Ending CV")
             break
-except KeyboardInterrupt:
+except:
     print("Keyboard interrupt. Exiting gracefully.")
     # Release the video capture object and close the OpenCV window
     cap.release()
