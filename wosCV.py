@@ -4,7 +4,7 @@ import face_recognition
 from mtcnn.mtcnn import MTCNN
 # Load the pre-trained MTCNN model
 detector = MTCNN()
-import time
+
 from datetime import datetime
 import numpy as np
 import threading
@@ -60,8 +60,6 @@ if not cap.isOpened():
 prototxt_path = 'deploy.prototxt'
 model_path = 'res10_300x300_ssd_iter_140000.caffemodel'
 # Example using deep learning-based face detection
-# net = cv2.dnn.readNetFromCaffe(prototxt_path, model_path)
-# blob = cv2.dnn.blobFromImage(frame, scalefactor=1.0, size=(300, 300), mean=(104.0, 177.0, 123.0))
 exit_flag = False
 
 def thread_worker(thread_id):
@@ -81,60 +79,6 @@ def thread_worker(thread_id):
         if (len(faces) > 0):
             cv2.imwrite("faces_detected/(MM){}.jpg".format(datetime.now()),frame)
             print("Found")
-        # blob = cv2.dnn.blobFromImage(frame, scalefactor=1.0, size=(width, height), mean=(104.0, 177.0, 123.0))
-        # net.setInput(blob)
-        # try: 
-        #     detections = net.forward()
-        # except:
-        #     continue;
-        # # Draw rectangles around detected faces
-        # for i in range(detections.shape[2]):
-        #     confidence = detections[0, 0, i, 2]
-        #     if confidence >= .8:  # Adjust confidence threshold as needed
-        #         print(f"""Status: 
-        #               known_face_names: {len(known_face_names)}
-        #               confidence: {confidence}
-        #                 """)
-        #         print(confidence);
-
-        #         box = detections[0, 0, i, 3:7] * np.array([width, height, width, height])
-        #         (startX, startY, endX, endY) = box.astype("int")
-        #         # cropped_face = frame[startY:endY, startX:endX]
-        #         # if cropped_face.size > 0:
-        #         # cv2.imwrite("faces_detected/(FD){}.jpg".format(datetime.now()),frame)
-
-        #         face_locations = face_recognition.face_locations(frame)
-        #         face_encodings = face_recognition.face_encodings(frame, face_locations)
-        #         # if len(known_face_names) > 10:
-        #         #     known_face_encodings = [];
-        #         #     known_face_names = [];
-        #         for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
-        #             matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
-        #             name = "unkown"
-        #             if True in matches:
-        #                 first_match_index = matches.index(True)
-        #                 name = known_face_names[first_match_index]
-
-        #             else:
-        #                 if len(known_face_encodings) < 20:
-        #                     known_face_encodings.append(face_encoding)
-        #                     name = f"Person{len(known_face_encodings)}"  # Assign a default name
-        #                     known_face_names.append(name)
-        #                 else:
-        #                     known_face_encodings.pop(0)
-        #                     known_face_names.pop(0)
-        #                     known_face_encodings.append(face_encoding)
-        #                     name = f"Person{len(known_face_encodings)}"  # Assign a default name
-        #                     known_face_names.append(name)
-
-        #                 cv2.rectangle(frame, (left, top), (right, bottom), (255, 0, 0), 2)
-        #                 # cropped_face = frame[startY:endY, startX:endX]
-        #         # if len(face_recognition.face_locations(frame)) > 0:
-        #             # print(confidence);
-        #         cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 2)
-
-        #         cv2.imwrite("faces_detected/{}.jpg".format(datetime.now()),frame)
-          
         thread_safe_q.task_done()
         
 # Create a thread array
