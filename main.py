@@ -1,103 +1,91 @@
 import cv2
-import numpy as np
-import threading
-import os
-import PySimpleGUI as sg
+from pytube import YouTube
+import face_recognition
+from datetime import datetime
 
-#global variables
-modes = ['Motion_Detection', 'Edge', 'Normal', 'Gray_Scale']
-videomode = 'Normal'; #[Motion_Detection, Edge, Normal,Gray_Scale]
-exitprotocol = False;
-#
-
-def video():#Display
-    global videomode,exitprotocol
-
-    cap = cv2.VideoCapture(1)
-    display = 'Computer Vision Display'
-    cv2.namedWindow(display, cv2.WINDOW_NORMAL)
-
-    while (exitprotocol != True):
-        ret, frame = cap.read()
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        
-        
-        print(videomode + " from CV")
-
-        if videomode == 'Normal':
-            cv2.imshow(display,frame)
-        elif videomode == 'Edge':
-            edges = cv2.Canny(frame,200,200) 
-            cv2.imshow(display,edges)
-        elif videomode == 'Gray_Scale':
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            cv2.imshow(display,gray)
-        else:
-            print("Unrecognized Video Mode")
-            exitprotocol = True
-            break
+# Replace 'https://youtu.be/kusY9S8BkMU' with the actual YouTube video URL
+youtube_url = 'https://www.youtube.com/watch?v=cH7VBI4QQzA'
+# Get the YouTube video object
+yt = YouTube(youtube_url)
+# Get the stream URL of the video
+stream_url = yt.streams.filter(file_extension='mp4').first().url
 
 
+faceCascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            exitprotocol = True
-            break
-    cap.release()
-    cv2.destroyAllWindows()
-    
+# eye_cascade = cv2.CascadeClassifier('haarcascade_eye.xml')
 
-def controls():#Controls for CV 
-    global videomode, exitprotocol, modes
-    ##Control UI
-    sg.theme('DarkAmber')   # Add a touch of color
-    layout = [
-        [sg.Text("Video Mode:", s=(60,1), font='Helvitica')],
-        [sg.Button("Normal")],
-        [sg.Button("Edge")],
-        [sg.Button("Motion Detection")],
-        [sg.Text("Custom Mode:")],
-        [sg.Multiline(size=(30,1), key='input'),sg.Button("Submit")],
-        [sg.Button("Exit")]
+# OpenCV window
+cv2.namedWindow("YouTube Video", cv2.WINDOW_NORMAL)
 
-    ]
-    controlpanel = sg.Window("Comuter Vision Control Station", layout)
-    ##
+# Open the video stream
+cap = cv2.VideoCapture(stream_url)
+# Load known faces
+known_face_encodings = []
+known_face_names = []
+# Check if the video opened successfully
+if not cap.isOpened():
+    print("Error: Could not open video stream.")
+    exit()
 
-    while (exitprotocol != True):     
-        event, values = controlpanel.read()
-        if event == sg.WIN_CLOSED or event == 'Exit': # if user closes window or clicks cancel
-            exitprotocol = True;
-            break
-        elif event == 'Edge':
-            videomode = 'Edge'
-        elif event == 'Motion Detection':
-            videomode = 'Motion_Detection'
-        elif event == 'Normal':
-            videomode = 'Normal'
-        elif event == 'Submit' and videomode in modes:
-            videomode = values['input']
-            
-    controlpanel.close()
+# Read and display frames
+while True:
+    ret, frame = cap.read()
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    try: 
+        ##faces = faceCascade.detectMultiScale(gray, 1.3, 5,minSize=(30, 30))
+        face_locations = face_recognition.face_locations(frame)
+        face_encodings = face_recognition.face_encodings(frame, face_locations)
+        # for (x,y,w,h) in faces:
+        #     cv2.rectangle(img,(x,y),(x+w,y+h),(255,0,0),2)
+        #     roi_gray = gray[y:y+h, x:x+w]
+        #     roi_color = img[y:y+h, x:x+w]
+        # print(str(datetime.now()))
+    # Loop through each face found in the frame
+        for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
+            # Check if the face matches any known faces
+            matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
 
-# creating threads
-if __name__ == "__main__":
+            name = "Unknown"
+
+            # If a match is found, use the name of the known face
+            if True in matches:
+                first_match_index = matches.index(True)
+                name = known_face_names[first_match_index]
+            else:
+                # If no match is found, add the new face to the known faces
+                known_face_encodings.append(face_encoding)
+                name = f"Person{len(known_face_encodings)}"  # Assign a default name
+                known_face_names.append(name)
+                cv2.imwrite("faces_detected/{}.jpg".format(datetime.now()),frame)
+
+            # Draw a rectangle around the face and display the name
+            cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
+            font = cv2.FONT_HERSHEY_DUPLEX
+            cv2.putText(frame, name, (left + 6, bottom - 6), font, 0.5, (255, 255, 255), 1)
+
+    # Display the resulting frame
+        cv2.imshow('Video', frame)
+        #cv2.imwrite("faces_detected/{}.jpg".format(datetime.now()),img)
   
-    # print ID of current process
-    print("ID of process running main program: {}".format(os.getpid()))
-  
-    # print name of main thread
-    print("Main thread name: {}".format(threading.current_thread().name))
-  
-    # creating threads
-    video = threading.Thread(target=video, name='Video')
-    controls = threading.Thread(target=controls, name='Controls')  
-  
-    # starting threads
-    video.start()
-    controls.start()
-  
-    # wait until all threads finish
-    video.join()
-    controls.join()
+        # status = cv2.imwrite('faces_detected/faces_detected.jpg', img)
+    except:
+        pass
+    #cv2.imshow('img',img)
+        # eyes = eye_cascade.detectMultiScale(roi_gray)
+        # for (ex,ey,ew,eh) in eyes:
+        #     cv2.rectangle(roi_color,(ex,ey),(ex+ew,ey+eh),(0,255,0),2)
 
+
+    if not ret:
+        print("Error: Failed to capture frame.")
+        break
+
+    # cv2.imshow('YouTube Video', img)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# Release the video capture object and close the OpenCV window
+cap.release()
+cv2.destroyAllWindows()
