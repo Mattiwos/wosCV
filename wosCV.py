@@ -73,10 +73,14 @@ def thread_worker(thread_id):
         print(f"Status: known_face_names: {len(known_face_names)}")
         # frame = cv2.cvtColor(grey, cv2.COLOR_BGR2GRAY)
         faces = detector.detect_faces(frame)
+        #[{'box': [1458, 596, 28, 37], 'confidence': 0.8205084800720215, 'keypoints': {'left_eye': (1471, 608), 'right_eye': (1482, 608), 'nose': (1480, 613), 'mouth_left': (1472, 622), 'mouth_right': (1481, 622)}}]
+        do = 0;
         for face in faces:
             x, y, width, height = face['box']
             cv2.rectangle(frame, (x, y), (x + width, y + height), (255, 0, 0), 2)
-        if (len(faces) > 0):
+            if face['confidence'] > .9:
+                do = 1
+        if (do == 1):
             cv2.imwrite("faces_detected/(MM){}.jpg".format(datetime.now()),frame)
             print("Found")
         thread_safe_q.task_done()
