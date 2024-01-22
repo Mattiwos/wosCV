@@ -23,7 +23,7 @@ pip install -U youtube-dl==2020.12.2 pafy
 ```
 to test program run main.py which will grab a live stream and start capturing faces and place them into a folder  
 ```
-main.py
+python wosFaceDetection.py
 ```
 
 
