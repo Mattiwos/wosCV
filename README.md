@@ -37,7 +37,7 @@ python wosFaceDetection.py
 <table>
   <tbody>
     <tr>  
-            <td align="center" valign="top" width="14.28%">
+            <td align="center" valign="top" width="100%">
               <a href="https://github.com/Mattiwos">
                 <img src="https://avatars.githubusercontent.com/u/44147357?v=4" width="100px;" alt="Jeroen Engels"/>
                 <br />

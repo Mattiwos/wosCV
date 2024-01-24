@@ -1,25 +1,52 @@
 import cv2
-from pytube import YouTube
+import pafy
 import face_recognition
+from mtcnn.mtcnn import MTCNN
+# Load the pre-trained MTCNN model
+detector = MTCNN()
+
 from datetime import datetime
+import numpy as np
+import threading
+import queue
+import argparse;
 
-# Replace 'https://youtu.be/kusY9S8BkMU' with the actual YouTube video URL
-youtube_url = 'https://www.youtube.com/watch?v=cH7VBI4QQzA'
-# Get the YouTube video object
-yt = YouTube(youtube_url)
-# Get the stream URL of the video
-stream_url = yt.streams.filter(file_extension='mp4').first().url
+parser = argparse.ArgumentParser();
+parser.add_argument('-l',help="source");
+args = parser.parse_args();
 
+if args.l is not None:
+    cv2.namedWindow("Local Video", cv2.WINDOW_NORMAL)
+    cap = cv2.VideoCapture(0)
+        # Get the height and width of the video capture
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    
+else:
+    # Replace 'https://youtu.be/kusY9S8BkMU' with the actual YouTube video URL
+    youtube_url = 'https://www.youtube.com/watch?v=cH7VBI4QQzA'
+    #youtube_url = 'https://www.youtube.com/watch?v=PDTmRgc2zQc'
+        # Get the YouTube video object
+    video = pafy.new(youtube_url)
+        # Get the stream URL of the video
+    best_stream = video.getbest(preftype="mp4")
+    print(best_stream)
+        # # Access the width and height attributes of the stream
+    width = int(best_stream.dimensions[1])
+    height = int(best_stream.dimensions[0])
+    print(f"Video Width: {width}, Height: {height}")
+        # OpenCV window
+    cv2.namedWindow("YouTube Video", cv2.WINDOW_NORMAL)
+        # Open the video stream
+    cap = cv2.VideoCapture(best_stream.url)
+    cv2.resizeWindow("YouTube Video", width, height)   
 
-faceCascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+    ## Tests to optimize opencv delays 
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 3)  # Set buffer size to reduce delay
+    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'H264'))
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
-# eye_cascade = cv2.CascadeClassifier('haarcascade_eye.xml')
-
-# OpenCV window
-cv2.namedWindow("YouTube Video", cv2.WINDOW_NORMAL)
-
-# Open the video stream
-cap = cv2.VideoCapture(stream_url)
 # Load known faces
 known_face_encodings = []
 known_face_names = []
@@ -28,64 +55,83 @@ if not cap.isOpened():
     print("Error: Could not open video stream.")
     exit()
 
-# Read and display frames
-while True:
-    ret, frame = cap.read()
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    try: 
-        ##faces = faceCascade.detectMultiScale(gray, 1.3, 5,minSize=(30, 30))
-        face_locations = face_recognition.face_locations(frame)
-        face_encodings = face_recognition.face_encodings(frame, face_locations)
-        # for (x,y,w,h) in faces:
-        #     cv2.rectangle(img,(x,y),(x+w,y+h),(255,0,0),2)
-        #     roi_gray = gray[y:y+h, x:x+w]
-        #     roi_color = img[y:y+h, x:x+w]
-        # print(str(datetime.now()))
-    # Loop through each face found in the frame
-        for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
-            # Check if the face matches any known faces
-            matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
 
-            name = "Unknown"
+# Load the pre-trained face detection model
+prototxt_path = 'deploy.prototxt'
+model_path = 'res10_300x300_ssd_iter_140000.caffemodel'
+# Example using deep learning-based face detection
+exit_flag = False
 
-            # If a match is found, use the name of the known face
-            if True in matches:
-                first_match_index = matches.index(True)
-                name = known_face_names[first_match_index]
-            else:
-                # If no match is found, add the new face to the known faces
-                known_face_encodings.append(face_encoding)
-                name = f"Person{len(known_face_encodings)}"  # Assign a default name
-                known_face_names.append(name)
-                cv2.imwrite("faces_detected/{}.jpg".format(datetime.now()),frame)
+def thread_worker(thread_id):
+    # global width, height
+    # print(f"Video Width: {width}, Height: {height}")
+    print("Thread worker {} beinning work".format(thread_id))
 
-            # Draw a rectangle around the face and display the name
-            cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
-            font = cv2.FONT_HERSHEY_DUPLEX
-            cv2.putText(frame, name, (left + 6, bottom - 6), font, 0.5, (255, 255, 255), 1)
+    while not exit_flag:
+        frame = thread_safe_q.get() ## switched
 
-    # Display the resulting frame
-        cv2.imshow('Video', frame)
-        #cv2.imwrite("faces_detected/{}.jpg".format(datetime.now()),img)
-  
-        # status = cv2.imwrite('faces_detected/faces_detected.jpg', img)
-    except:
-        pass
-    #cv2.imshow('img',img)
-        # eyes = eye_cascade.detectMultiScale(roi_gray)
-        # for (ex,ey,ew,eh) in eyes:
-        #     cv2.rectangle(roi_color,(ex,ey),(ex+ew,ey+eh),(0,255,0),2)
+        print(f"Status: known_face_names: {len(known_face_names)}")
+        # frame = cv2.cvtColor(grey, cv2.COLOR_BGR2GRAY)
+        faces = detector.detect_faces(frame)
+        #[{'box': [1458, 596, 28, 37], 'confidence': 0.8205084800720215, 'keypoints': {'left_eye': (1471, 608), 'right_eye': (1482, 608), 'nose': (1480, 613), 'mouth_left': (1472, 622), 'mouth_right': (1481, 622)}}]
+        do = 0;
+        for face in faces:
+            x, y, width, height = face['box']
+            cv2.rectangle(frame, (x, y), (x + width, y + height), (255, 0, 0), 2)
+            if face['confidence'] > .9:
+                do = 1
+        if (do == 1):
+            cv2.imwrite("faces_detected/(MM){}.jpg".format(datetime.now()),frame)
+            print("Found")
+        thread_safe_q.task_done()
+        
+# Create a thread array
+threads = []
+NUM_THREADS = 1;
+
+try: 
+    # Turn-on the worker thread.
+    # Read and display frames
+    MAX_QUEUE_SIZE = 10  # Adjust as needed
+
+    thread_safe_q = queue.Queue(maxsize=MAX_QUEUE_SIZE)
+        # Create and start threads
+    for i in range(NUM_THREADS):
+        thread = threading.Thread(target=thread_worker, args=(i,), daemon=True)
+        thread.start()
+        threads.append(thread)
+
+    while True: ## create a thread pool to handle this
+        ret, frame = cap.read()
+        # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        thread_safe_q.put(frame)
+        # print(f"queue size: {thread_safe_q.qsize()}")
+        if thread_safe_q.full():
+            thread_safe_q.get()
+        # frame = thread_safe_q.get() 
+        # if not ret:
+        #     print("Error: Failed to capture frame.")
+        #     break
+
+        cv2.imshow('YouTube Video', frame)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            print("Ending CV")
+            break
+except:
+    print("Keyboard interrupt. Exiting gracefully.")
+    # Release the video capture object and close the OpenCV window
+    cap.release()
+    cv2.destroyAllWindows()
+
+    # Block until all tasks are done.
+    thread_safe_q.join()
+    # Wait for all threads to complete
+    for thread in threads:
+        thread.join()
+    exit_flag = True
+    # threads.join()
+    print("cleaning up threads")
+print('All work completed')
 
 
-    if not ret:
-        print("Error: Failed to capture frame.")
-        break
-
-    # cv2.imshow('YouTube Video', img)
-
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-# Release the video capture object and close the OpenCV window
-cap.release()
-cv2.destroyAllWindows()
